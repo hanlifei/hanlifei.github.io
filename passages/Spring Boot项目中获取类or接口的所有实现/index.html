@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+  
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="utf-8">
+  <meta name="author" content="韩利飞, 18238538331@163.com">
+  
+  
+  
+  <title>Spring Boot项目中获取类or接口的所有实现 | 睡不醒的猿</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  
+    <meta name="keywords" content="功能实现,java,Spring Boot,">
+  
+
+  
+    <meta name="description" content="不奢求产生多少高质文章(当然越多越好), 只求自己有个记录的地方">
+  
+
+  
+
+  
+    <link rel="icon" href="/images/favicon.ico">
+    <link rel="apple-touch-icon" href="/images/touch-icon.png">
+  
+
+  <link href="https://cdn.bootcss.com/fancybox/3.5.2/jquery.fancybox.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/icon/iconfont.css">
+<link rel="stylesheet" href="/css/github-markdown.css">
+<link rel="stylesheet" href="/css/highlight.css">
+
+  <script src="/js/util.js"></script>
+<script src="/js/valine.min.js"></script>
+
+  
+
+  
+    <link href="https://cdn.bootcss.com/aplayer/1.10.1/APlayer.min.css" rel="stylesheet">
+    <script src="https://cdn.bootcss.com/aplayer/1.10.1/APlayer.min.js" async></script>
+  
+
+  
+    <link href="https://cdn.bootcss.com/social-share.js/1.0.16/css/share.min.css" rel="stylesheet">
+  
+  
+  <script src="//cdn.bootcss.com/jquery/3.3.1/jquery.min.js" async></script>
+  
+  
+    <script src="//cdn.jsdelivr.net/npm/leancloud-storage@3.11.0/dist/av-min.js"></script>
+  
+
+</head>
+
+
+  <body>
+
+    
+
+    <div id="app">
+
+      <div class="header-wrap">
+  <header>
+    <div class="site-brand">
+      <div class="site-title">
+        <a href="/">睡不醒的猿</a>
+      </div>
+    </div>
+    <nav class="site-navigation">
+      <ul class="nav-menu">
+      
+        <li class="nav-item" data-path="/">
+          
+            <a href="/" target="_self">
+              主页
+            </a>
+          
+        </li>
+      
+        <li class="nav-item" data-path="/archives/">
+          
+            <a href="/archives/" target="_self">
+              归档
+            </a>
+          
+        </li>
+      
+        <li class="nav-item" data-path="/categories/">
+          
+            <a href="/categories/" target="_self">
+              分类
+            </a>
+          
+        </li>
+      
+        <li class="nav-item" data-path="/tags/">
+          
+            <a href="/tags/" target="_self">
+              标签
+            </a>
+          
+        </li>
+      
+        <li class="nav-item" data-path="/about/">
+          
+            <a href="/about/" target="_self">
+              关于
+            </a>
+          
+        </li>
+      
+      </ul>
+    </nav>
+    <i class="iconfont icon-menu"></i>
+  </header>
+</div>
+
+<script>
+  let links = document.querySelectorAll('.nav-item');
+  for(let link of links){
+    let childrenLink = link.querySelector('ul');
+    link.addEventListener('mouseenter', () => {
+      if(childrenLink) {
+        childrenLink.className = "nav-menu--dropdown active";
+      }
+    })
+    link.addEventListener('mouseleave', () => {
+      if(childrenLink) {
+        childrenLink.className = "nav-menu--dropdown";
+      }
+    })
+  }
+  let rootRealPath = getRealPath(window.location.pathname, true);
+  for(let link of links) {
+    let linkPath = link.getAttribute("data-path");
+    if(linkPath && getRealPath(linkPath, true) === rootRealPath) {
+      link.className = "nav-item hover";
+    }
+  }
+
+  let iconMenu = document.querySelector("i.iconfont.icon-menu"),
+    iconMenuClicked = false;
+  let navDOM = document.querySelector("nav.site-navigation");
+  iconMenu.addEventListener("click", () => {
+    iconMenuClicked 
+      ? navDOM.className = "site-navigation active"
+      : navDOM.className = "site-navigation";
+    iconMenuClicked = !iconMenuClicked;
+  })
+</script>
+
+      
+
+
+
+
+
+
+
+
+<div class="container post-index">
+
+  
+
+<div class="post">
+  <h1 class="article-title">
+    <span>Spring Boot项目中获取类or接口的所有实现</span>
+  </h1>
+  <div class="article-top-meta">
+    <span>
+      发布 : 
+      2019-02-14
+    </span>
+    
+      <span>
+        分类 : 
+          <a href="/categories/功能实现/">
+            功能实现
+          </a>
+      </span>
+    
+    
+      <span>
+        浏览 : <span class="article-timer" data-identity="Spring Boot项目中获取类or接口的所有实现"></span>
+      </span>
+    
+  </div>
+
+  
+
+  <div class="article-content">
+    <div class="markdown-body">
+      <h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>java是没有提供直接的api获取某个类or接口的子类的, 所以需要自己进行实现</p>
+<h1 id="实现思路"><a href="#实现思路" class="headerlink" title="实现思路"></a>实现思路</h1><ul>
+<li>首先获取所有源码类</li>
+<li>其次结合反射获得bean</li>
+<li>最后判断是否是父类or接口的子类</li>
+</ul>
+<p>那么实现这个功能需要有前提: <strong>父类or接口的子类在同一个文件夹内, 因为如果是散乱分布的话, 在加上项目文件较多, 获取源码类的时候的搜索范围会很大</strong></p>
+<h1 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h1><h2 id="开发环境"><a href="#开发环境" class="headerlink" title="开发环境"></a>开发环境</h2><p>环境: idea+maven+spring boot<br>maven项目运行spring boot项目时, 项目的class源文件是在target文件夹下的class文件夹中, class文件夹是一个独立的文件夹, 通过这点, 可以直接通过全路径查找路径下的源文件<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> ArrayList&lt;Class&gt; <span class="title">findClass</span><span class="params">(File file, String packagename)</span> </span>&#123;</span><br><span class="line">    ArrayList&lt;Class&gt; list = <span class="keyword">new</span> ArrayList&lt;&gt;();</span><br><span class="line">    <span class="keyword">if</span> (!file.exists()) &#123;</span><br><span class="line">        log.debug(<span class="string">"fileNoExists"</span>);</span><br><span class="line">        <span class="keyword">return</span> list;</span><br><span class="line">    &#125;</span><br><span class="line">    File[] files = file.listFiles();</span><br><span class="line">    <span class="keyword">for</span> (File file2 : files) &#123;</span><br><span class="line">        <span class="keyword">if</span> (file2.isDirectory()) &#123;</span><br><span class="line">            <span class="comment">//添加断言用于判断</span></span><br><span class="line">            <span class="keyword">assert</span> !file2.getName().contains(<span class="string">"."</span>);</span><br><span class="line">            ArrayList&lt;Class&gt; arrayList = findClass(file2, packagename + <span class="string">"."</span> + file2.getName());</span><br><span class="line">            list.addAll(arrayList);</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (file2.getName().endsWith(<span class="string">".class"</span>)) &#123;</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                <span class="comment">//保存的类文件不需要后缀.class</span></span><br><span class="line">                list.add(Class.forName(packagename + <span class="string">'.'</span> + file2.getName().substring(<span class="number">0</span>,</span><br><span class="line">                        file2.getName().length() - <span class="number">6</span>)));</span><br><span class="line"></span><br><span class="line">            &#125; <span class="keyword">catch</span> (ClassNotFoundException e) &#123;</span><br><span class="line">                e.printStackTrace();</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> list;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h2 id="jar包环境"><a href="#jar包环境" class="headerlink" title="jar包环境"></a>jar包环境</h2><p>当项目打成jar包后, 项目的class源文件存储在jar包内的BOOT-INF文件夹下的classes文件夹中, 该文件夹在jar中, 并不是一个独立的文件夹, 所以无法像开发环境那样直接通过路径进行获取, 需要借助JarFile这个工具类<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> ArrayList&lt;Class&gt; <span class="title">findClassByJar</span><span class="params">(String packageName, URL url)</span> </span>&#123;</span><br><span class="line">    ArrayList&lt;Class&gt; list = <span class="keyword">new</span> ArrayList&lt;&gt;();</span><br><span class="line">    String urlStr = url.toString();</span><br><span class="line">    <span class="comment">// 找到!/ 截断之前的字符串</span></span><br><span class="line">    String jarPath = urlStr.substring(<span class="number">0</span>, urlStr.indexOf(<span class="string">"!/"</span>) + <span class="number">2</span>);</span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">        log.debug(<span class="string">"-------------jarPath"</span> + jarPath);</span><br><span class="line">        URL jarURL = <span class="keyword">new</span> URL(jarPath);</span><br><span class="line">        JarURLConnection jarCon = (JarURLConnection) jarURL.openConnection();</span><br><span class="line">        JarFile jarFile = jarCon.getJarFile();</span><br><span class="line">        Enumeration&lt;JarEntry&gt; jarEntrys = jarFile.entries();</span><br><span class="line">        <span class="keyword">while</span> (jarEntrys.hasMoreElements()) &#123;</span><br><span class="line">            JarEntry entry = jarEntrys.nextElement();</span><br><span class="line">            <span class="comment">// 简单的判断路径，如果想做到像Spring，Ant-Style格式的路径匹配需要用到正则。</span></span><br><span class="line">            <span class="comment">//获取到的className = BOOT-INF/classes/com/.../child.class</span></span><br><span class="line">            String className = entry.getName();</span><br><span class="line">            <span class="comment">//去除className的前缀BOOT-INF/classes/</span></span><br><span class="line">            <span class="keyword">if</span> (!entry.isDirectory() &amp;&amp; className.startsWith(<span class="string">"BOOT-INF/classes/"</span>)) &#123;</span><br><span class="line">                className = className.substring(<span class="number">17</span>).replace(<span class="string">'/'</span>, <span class="string">'.'</span>);</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="keyword">continue</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            log.debug(<span class="string">"-------------entryName: "</span> + className);</span><br><span class="line">            <span class="keyword">if</span> (className.startsWith(packageName)) &#123;</span><br><span class="line">                <span class="comment">//保存的类文件不需要后缀.class</span></span><br><span class="line">                list.add(Class.forName(className.substring(<span class="number">0</span>, className.length() - <span class="number">6</span>)));</span><br><span class="line">            &#125;</span><br><span class="line">            log.debug(<span class="string">"-------------!entry.isDirectory()"</span> + !entry.isDirectory());</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">        e.printStackTrace();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> list;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h2 id="封装使用"><a href="#封装使用" class="headerlink" title="封装使用"></a>封装使用</h2><p>将上面两种针对不同环境的代码进行封装, 对外提供一个接口供使用<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">    * <span class="doctag">@param</span> parent 父类</span></span><br><span class="line"><span class="comment"> *        packageName 子类包路径</span></span><br><span class="line"><span class="comment">    * <span class="doctag">@return</span> 子类集合</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> List&lt;Class&gt; <span class="title">getChildrenClasses</span><span class="params">(Class parentClass, String packageName)</span> </span>&#123;</span><br><span class="line">       ArrayList&lt;Class&gt; list = <span class="keyword">new</span> ArrayList&lt;&gt;();</span><br><span class="line">       ClassLoader classLoader = Thread.currentThread().getContextClassLoader();</span><br><span class="line">       String path = packageName.replace(<span class="string">'.'</span>, <span class="string">'/'</span>);</span><br><span class="line">       <span class="keyword">try</span> &#123;</span><br><span class="line">           ArrayList&lt;File&gt; fileList = <span class="keyword">new</span> ArrayList&lt;&gt;();</span><br><span class="line">           <span class="comment">/**</span></span><br><span class="line"><span class="comment">            * 这里面的路径使用的是相对路径</span></span><br><span class="line"><span class="comment">            * 另外，路径中切不可包含空格、特殊字符等！"../bin/"</span></span><br><span class="line"><span class="comment">            */</span></span><br><span class="line">           Enumeration&lt;URL&gt; enumeration = classLoader.getResources(path);</span><br><span class="line">           <span class="keyword">while</span> (enumeration.hasMoreElements()) &#123;</span><br><span class="line">               URL url = enumeration.nextElement();</span><br><span class="line">               log.debug(<span class="string">"------------url: "</span> + url.toString());</span><br><span class="line">               <span class="keyword">if</span> (url.toString().indexOf(<span class="string">"jar!/"</span>) &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                   list.addAll(findClassByJar(packageName, url));</span><br><span class="line">               &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                   list.addAll(findClass(<span class="keyword">new</span> File(url.getFile()), packageName));</span><br><span class="line">               &#125;</span><br><span class="line">           &#125;</span><br><span class="line">       &#125; <span class="keyword">catch</span> (IOException e) &#123;</span><br><span class="line">           e.printStackTrace();</span><br><span class="line">       &#125;</span><br><span class="line">       <span class="keyword">return</span> list.stream()</span><br><span class="line">               <span class="comment">// 忽略接口类</span></span><br><span class="line">               .filter(child -&gt; !Modifier.isInterface(child.getModifiers()))</span><br><span class="line">               <span class="comment">// 忽略抽象类</span></span><br><span class="line">               .filter(child -&gt; !Modifier.isAbstract(child.getModifiers()))</span><br><span class="line">               <span class="comment">// 是否是子类</span></span><br><span class="line">               .filter(child -&gt; parentClass.isAssignableFrom(child))</span><br><span class="line">               .collect(Collectors.toList());</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure></p>
+<p>调用<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">List&lt;Class&gt; children = ClassUtils.getAllClass(Parent.class, <span class="string">"com.child.packagename"</span>);</span><br></pre></td></tr></table></figure></p>
+    </div>
+  </div>
+  
+    <div class="copy-right">
+      <div class="markdown-body">
+        <blockquote>
+        
+        
+          本文作者 : HLF <br>
+        
+        原文链接 : <a href="">https://hanlifei.github.io/passages/Spring Boot项目中获取类or接口的所有实现/</a><br>
+        版权声明 : 本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> 许可协议。转载请注明出处！
+        </blockquote>
+      </div>
+    </div>
+  
+  
+  
+    <div class="social-share" style="margin-top: -2rem" data-wechat-qrcode-title="<p>微信扫一扫</p>" data-wechat-qrcode-helper="<p>微信右上角, 扫一扫分享</p>" data-sites="qzone, qq, weibo, wechat, douban, google, facebook, twitter">
+  <span style="color: #6b7487; font-size: 1.4rem;">分享到: </span>
+</div>
+<script src="https://cdn.bootcss.com/social-share.js/1.0.16/js/social-share.min.js" async></script>
+  
+
+  
+
+  <div class="article-footer">
+    <div class="article-meta pull-left">
+      <span>
+        
+          <i class="iconfont icon-06tags"></i>标签: 
+          
+          <span class="span--tag">
+            <a href="/tags/java/">
+              #java
+            </a>
+          </span>
+          
+          <span class="span--tag">
+            <a href="/tags/Spring-Boot/">
+              #Spring Boot
+            </a>
+          </span>
+          
+        
+      </span>
+    </div>
+    <div class="article-meta pull-right">
+    </div>
+  </div>
+</div>
+
+
+  <aside id="sidebar">
+    <p id="sidebar-header"></p>
+    <ol id="sidebar-toc"></ol>
+  </aside>
+  <script async>setTimeout(generateToc, 10);</script>
+
+
+  <nav class="post-navigation">
+    
+      <div class="nav-pre">
+        <i class="iconfont icon-prev"></i>
+        上一篇:
+        <a href="/passages/test-one/" target="_self">test-one</a>
+      </div>
+    
+    
+  </nav>
+
+  
+    <a href="#comment" class="comment-anchor"></a>
+<div class="comment-title"><i class="iconfont icon-footprint"></i> 留下足迹 <i class="iconfont icon-footprint"></i></div>
+<div id="vcomments"></div>
+
+<script defer>
+  if( true ) {
+    let path = getRealPath()
+    new Valine({
+      el: "#vcomments",
+      appId: "BMq2ahaqbgnIVvCL6E3DvPEx-gzGzoHsz",
+      appKey: "5w7DnJzF9OTbBADRuD4lPCiN",
+      notify: false,
+      verify: false,
+      avatar: "robohash",
+      placeholder: "正确填写邮箱, 才能及时收到回复哦♪(^∇^*)",
+      path
+    });
+  }
+</script>
+   
+
+  
+    <script defer>
+const valineAPI = (() => {
+  try {
+    AV.init("BMq2ahaqbgnIVvCL6E3DvPEx-gzGzoHsz", "5w7DnJzF9OTbBADRuD4lPCiN");
+  } catch(error) {}
+  const isExist = (identity) => {
+    identity = identity || getRealPath();
+    let query = new AV.Query('Timer');
+    return new Promise((resolve, reject) => {
+      query.equalTo("identity", identity);
+      query.find().then(results => {
+        resolve(results.length > 0);
+      }, error => reject(error));
+    })
+  }
+
+  const _get = (identity) => {
+    let query = null;
+    if(identity && identity instanceof Array){
+      let querys = [];
+      for(let i = 0; i < identity.length; ++i) {
+        querys[i] = new AV.Query('Timer');
+        querys[i].equalTo('identity', identity[i]);
+      }
+      query = AV.Query.or.apply(null ,querys);
+    } else {
+      identity = identity || getRealPath();
+      query = new AV.Query("Timer");
+      query.equalTo("identity", identity);
+    }
+
+    return new Promise((resolve, reject) => {
+      query.find()
+      .then(results => resolve(results))
+      .catch(error => reject(error))
+    })
+  }
+
+  const create = (identity) => {
+    identity = identity || getRealPath();
+    return new Promise((resolve, reject) => {
+      let Todo = AV.Object.extend('Timer');
+      let todo = new Todo();
+      todo.set("times", 1);
+      todo.set("identity", identity);
+      todo.save().then(res => resolve(true), error => reject(error));
+    })
+  }
+
+  const update = (identity) => {
+    identity = identity || getRealPath();
+    return new Promise((resolve, reject) => {
+      let query = new AV.Query('Timer');
+      query.equalTo("identity", identity);
+      query.find().then(todos => {
+        todos.forEach(todo => {
+          todo.set("times", todo.attributes.times + 1);
+        });
+        return AV.Object.saveAll(todos);
+      }).then(todos => resolve(true), error => reject(error));
+    })
+  }
+
+  return {
+    isExist,
+    _get,
+    update,
+    create
+  }
+})()
+
+const calcAndWriteTimes = () => {
+  let isPost = true;
+
+  let timerAllDOM = document.querySelectorAll(".article-timer");
+
+  if(isPost) {
+    let identity = timerAllDOM[0].getAttribute("data-identity");
+    valineAPI.isExist(identity)
+    .then(exist => {
+      if(exist) {
+        return valineAPI.update(identity);
+      }
+      return new Promise(resolve => resolve(true));
+    })
+    .then( succuess => valineAPI._get(identity))
+    .then( result => timerAllDOM[0].innerText = result[0].attributes.times)
+    .catch(error => console.log(error.message))
+    return ;
+  }
+
+  let timerDOMCache = {};
+
+  for(let timerDOM of timerAllDOM) {
+    let identity = timerDOM.getAttribute("data-identity");
+    if(timerDOMCache.hasOwnProperty(identity)){
+      timerDOMCache[identity].dom.push(timerDOM);
+    }else{
+      timerDOMCache[identity] = {
+        dom: [timerDOM],
+        times: undefined
+      };
+    }
+  }
+
+  let identities = Object.keys(timerDOMCache);
+  valineAPI._get(identities).then(results => {
+    for(let result of results) {
+      let {identity, times} = result.attributes;
+      timerDOMCache[identity].times = times;
+      timerDOMCache[identity].dom.map(item => item.innerText = times);
+    }
+    for(let identity of identities) {
+      if(timerDOMCache[identity].times){
+        continue;
+      }
+      timerDOMCache[identity].dom.map(item => item.innerText = 1);
+      valineAPI.create(identity);
+    }
+  }).catch(error => console.log(error.message))
+}
+
+if(true){
+  calcAndWriteTimes();
+}
+</script>
+   
+
+</div>
+
+
+      <footer>
+  <p class="site-info">
+    博客坚持了运行<span id="time-to-now"></span>
+<!-- <span class="my-face">(●'◡'●)ﾉ♥</span> -->
+    <br>
+    <span class="my-face">尊重开源,保留原创信息</span>  | Theme - <a href="https://github.com/dongyuanxin/theme-bmw">BMW</a>  |  Powered by <a href="https://godbmw.com/">GodBMW</a>
+    <br>
+    
+  </p>
+</footer>
+
+
+
+<script>
+const timeToNowDOM = document.querySelector("#time-to-now");
+const startTimestamp = new Date(2019, 0, 28).getTime();
+
+const updateTimeStr = () => {
+  let offset = parseInt(
+      (new Date().getTime() - startTimestamp) / 1000,
+      10
+    ),
+    day = Math.floor(offset / 86400),
+    hour = Math.floor((offset % 86400) / 3600),
+    minute = Math.floor(((offset % 86400) % 3600) / 60),
+    second = Math.floor(((offset % 86400) % 3600) % 60);
+  timeToNowDOM.innerHTML =
+    day + "天" + hour + "小时" + minute + "分钟" + second + "秒";
+  setTimeout(updateTimeStr, 500);
+}
+
+setTimeout(updateTimeStr, 500);
+</script>
+
+
+      <div class="back-to-top hidden">
+  <span>
+    <i class="iconfont icon-60"></i><span></span>%
+  </span>
+</div>
+
+<script>
+const updateIconToTop = percent => {
+  let dom = document.querySelector(".back-to-top span span");
+  dom.innerText = percent;
+  if(percent < 1) {
+    document.querySelector(".back-to-top").className = "back-to-top hidden";
+  } else {
+    document.querySelector(".back-to-top").className = "back-to-top";
+  }
+}
+
+const handleScoll = () => {
+  let isRunning = false;
+  return () => {
+    if (isRunning) return;
+    isRunning = true;
+    window.requestAnimationFrame(timestamp => {
+      let scrollTop =
+          document.documentElement.scrollTop || document.body.scrollTop,
+        scrollHeight =
+          document.documentElement.scrollHeight ||
+          document.body.scrollHeight,
+        clientHeight =
+          document.documentElement.clientHeight ||
+          document.body.clientHeight;
+      isRunning = false;
+      if (scrollTop <= 1) {
+        updateIconToTop(0);
+        return;
+      }
+      if (scrollTop + clientHeight >= scrollHeight) {
+        updateIconToTop(100);
+      } else {
+        updateIconToTop(parseInt(
+          100 * scrollTop / (scrollHeight - clientHeight),
+          10
+        ));
+      }
+    });
+  };
+}
+
+const backToTop = () => {
+  let scrollTop =
+      document.documentElement.scrollTop || document.body.scrollTop,
+    delay = 10,
+    time = 200;
+  if (scrollTop <= 20) {
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    return;
+  }
+  let step = Math.ceil(scrollTop * delay / time);
+  let timer = setInterval(() => {
+    scrollTop =
+      document.documentElement.scrollTop || document.body.scrollTop;
+    if (scrollTop - step <= 0) {
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      clearInterval(timer);
+    } else {
+      document.documentElement.scrollTop = scrollTop - step;
+      document.body.scrollTop = scrollTop - step;
+    }
+  }, delay);
+}
+
+document.addEventListener("scroll", handleScoll(), false);
+
+document.querySelector(".back-to-top").addEventListener("click", backToTop, false);
+
+</script>
+
+    </div>
+
+    
+      <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML" async></script>
+<script>
+  (() => {
+    const mathjaxConfig = {
+      showProcessingMessages: false, //关闭js加载过程信息
+      messageStyle: "none", //不显示信息
+      jax: ["input/TeX", "output/HTML-CSS"],
+      tex2jax: {
+        inlineMath: [["$", "$"], ["\\(", "\\)"]], //行内公式选择符
+        displayMath: [["$$", "$$"], ["\\[", "\\]"]], //段内公式选择符
+        skipTags: ["script", "noscript", "style", "textarea", "pre", "code", "a"] //避开某些标签
+      },
+      "HTML-CSS": {
+        availableFonts: ["STIX", "TeX"], //可选字体
+        showMathMenu: false //关闭右击菜单显示
+      }
+    }
+
+    let mathjaxInterval = setInterval(() => {
+      if(!window.MathJax){
+        return;
+      }
+      window.MathJax.Hub.Config(mathjaxConfig)
+      window.MathJax.Hub.Queue(["Typeset", MathJax.Hub, document.getElementById('app')])
+
+      clearInterval(mathjaxInterval)
+    }, 10)    
+  })()
+</script>
+    
+
+    <script src="https://cdn.bootcss.com/fancybox/3.5.2/jquery.fancybox.min.js" async></script>
+<script async>
+  let fancyTimer = setInterval(function(){
+    if(!window.$){
+      return;
+    }
+    $(document).ready(function() {
+      $(".post img").each(function () {
+        if($(this).parent().get(0).tagName.toLowerCase() === "a") {
+          return;
+        }
+        // $(this).attr("data-fancybox", "gallery"); // if you add 'data-fancybox', img will display after showed
+        var element = document.createElement("a");
+        $(element).attr("data-fancybox", "gallery");
+        $(element).attr("href", $(this).attr("src"));
+        $(this).wrap(element);
+      });
+      
+      clearInterval(fancyTimer);
+    });
+  }, 10);
+</script>
+
+    
+  </body>
+
+</html>
