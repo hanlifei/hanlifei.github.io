@@ -74,8 +74,8 @@ D
 >
 > ```javascript
 > module.exports = {
->   title: 'Hello VuePress',
->   description: 'Just playing around'
+>   title: 'Hello VuePress', //网站的标题。这将是所有页面标题的前缀，并显示在默认主题的导航栏中
+>   description: 'Just playing around' //网站描述。这将在页面 HTML 中表现为一个 <meta> 标签
 > }
 > ```
 
